@@ -1,14 +1,22 @@
 import streamlit as st
-import anthropic
+from groq import Groq
 import json
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 from datetime import datetime
 
+# ── Groq client via Streamlit secrets ────────────────────────────────────────
+# Add to .streamlit/secrets.toml:
+#   GROQ_API_KEY = "your_groq_api_key_here"
+def get_groq_client():
+    return Groq(api_key=st.secrets["GROQ_API_KEY"])
+
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
 # ── Page config ──────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="ShiftIQ",
+    page_title="GembaIQ",
     page_icon="🏭",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -219,7 +227,7 @@ def oee_gauge(value, label):
 
 # ── AI: Kaizen Recommendations ────────────────────────────────────────────────
 def get_kaizen_recs(oee, losses, notes, line_name):
-    client = anthropic.Anthropic()
+    client = get_groq_client()
 
     top_losses = losses[:3] if losses else []
     loss_text  = "\n".join([f"  - {l['loss']} ({l['type']}): {l['minutes']} mins lost, {l['pct']}% of planned time"
@@ -262,18 +270,18 @@ Respond ONLY with valid JSON, no markdown, no preamble:
   ]
 }}"""
 
-    resp = client.messages.create(
-        model="claude-sonnet-4-20250514",
+    resp = client.chat.completions.create(
+        model=GROQ_MODEL,
         max_tokens=900,
         messages=[{"role": "user", "content": prompt}]
     )
-    raw = resp.content[0].text.strip().replace("```json", "").replace("```", "").strip()
+    raw = resp.choices[0].message.content.strip().replace("```json", "").replace("```", "").strip()
     return json.loads(raw)
 
 
 # ── AI: Handover Report ───────────────────────────────────────────────────────
 def get_handover_report(shift_meta, oee, losses, kaizen, notes):
-    client = anthropic.Anthropic()
+    client = get_groq_client()
 
     top_issue   = losses[0]["loss"]  if losses  else "None identified"
     top_kaizen  = kaizen["opportunities"][0]["title"] if kaizen else "Pending analysis"
@@ -305,12 +313,12 @@ TOP PRIORITY ACTION
 
 Keep total under 220 words. Direct, no fluff, military-style brevity."""
 
-    resp = client.messages.create(
-        model="claude-sonnet-4-20250514",
+    resp = client.chat.completions.create(
+        model=GROQ_MODEL,
         max_tokens=500,
         messages=[{"role": "user", "content": prompt}]
     )
-    return resp.content[0].text.strip()
+    return resp.choices[0].message.content.strip()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -320,7 +328,7 @@ Keep total under 220 words. Direct, no fluff, military-style brevity."""
 # Header
 st.markdown("""
 <div style='padding:24px 0 8px'>
-  <span style='font-size:28px;font-weight:700;color:#f9fafb;'>🏭 ShiftIQ</span>
+  <span style='font-size:28px;font-weight:700;color:#f9fafb;'>🏭 GembaIQ</span>
   <span style='font-size:14px;color:#6b7280;margin-left:12px;'>OEE · Kaizen · Handover · Tesla Battery Production</span>
 </div>
 """, unsafe_allow_html=True)
